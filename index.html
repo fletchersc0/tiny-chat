@@ -3,105 +3,39 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Melbourne Wall Chat</title>
+<title>Tiny Chat — Single Room</title>
 <style>
-  /* ======= Plain, text-first aesthetic (inspired by the second page) ======= */
   * { box-sizing: border-box; }
-  :root {
-    --bg: #fff;
-    --text: #000;
-    --border: #000;
-    --muted: #444;
-    --maxw: 860px;
-  }
-  html, body { height: 100%; }
-  body {
-    margin: 0;
-    font: 16px/1.5 "Times New Roman", Times, serif;
-    background: var(--bg);
-    color: var(--text);
-  }
-  a { color: inherit; }
-  a:hover { text-decoration: underline; }
-
-  header, footer {
-    position: fixed; left: 0; right: 0; height: 56px;
-    display: flex; align-items: center;
-    background: var(--bg); z-index: 10;
-  }
-  header { top: 0; border-bottom: 1px solid var(--border); }
-  footer { bottom: 0; border-top: 1px solid var(--border); }
-
-  .wrap { width: 100%; max-width: var(--maxw); margin: 0 auto; padding: 0 12px; }
-
-  /* Header */
-  .head-row { display: flex; align-items: baseline; gap: 12px; }
-  .head-row h1 { font: bold 18px/1 "Times New Roman", Times, serif; margin: 0; }
-  .pill { display: inline-block; font-size: 13px; padding: 2px 6px; border: 1px solid var(--border); }
-  #presence, #typing { font-size: 13px; color: var(--muted); margin-top: 4px; }
-  .controls { margin-left: auto; display: flex; gap: 8px; }
-  button, .link-btn {
-    font: 14px/1.2 "Times New Roman", Times, serif;
-    background: transparent; color: var(--text);
-    border: 1px solid var(--border); padding: 6px 10px; cursor: pointer;
-  }
-  .link-btn { text-decoration: none; display: inline-block; }
-
-  /* Main area */
-  main {
-    margin-top: 56px; margin-bottom: 56px;
-    height: calc(100vh - 112px);
-    overflow: auto;
-    border-left: 1px solid var(--border);
-    border-right: 1px solid var(--border);
-  }
-  #log { padding: 8px 12px 16px 12px; }
-  #loadMore {
-    display: none;
-    margin: 8px 0 12px 0;
-    background: transparent;
-    border: 1px solid var(--border);
-    padding: 4px 8px; font-size: 14px; cursor: pointer;
-  }
-
-  /* Messages: plain lines */
-  .msg {
-    padding: 6px 0;
-    border-bottom: 1px solid #000;
-    word-wrap: break-word; overflow-wrap: anywhere;
-  }
-  .time { color: var(--muted); }
-  .name { font-weight: bold; }
-  .body { white-space: pre-wrap; }
-
-  /* Footer / composer */
-  .composer { display: flex; gap: 8px; align-items: center; }
-  input[type="text"] {
-    font: 16px/1.4 "Times New Roman", Times, serif;
-    border: 1px solid var(--border);
-    background: transparent; color: var(--text);
-    padding: 6px 8px;
-  }
-  #name { max-width: 200px; }
-  #body { flex: 1; }
-  #send { padding: 6px 12px; }
-
-  small.help { display: block; margin-top: 6px; color: var(--muted); font-size: 13px; }
-  @media (max-width: 520px) {
-    .controls { display: none; } /* keep header minimal on phones */
-  }
+  :root { --bg:#fff; --text:#000; --border:#000; --muted:#444; --maxw:860px; }
+  html, body { height:100%; }
+  body { margin:0; font:16px/1.5 "Times New Roman", Times, serif; background:var(--bg); color:var(--text); }
+  header, footer { position:fixed; left:0; right:0; height:56px; display:flex; align-items:center; background:var(--bg); z-index:10; }
+  header { top:0; border-bottom:1px solid var(--border); }
+  footer { bottom:0; border-top:1px solid var(--border); }
+  .wrap { width:100%; max-width:var(--maxw); margin:0 auto; padding:0 12px; }
+  .head-row { display:flex; align-items:baseline; gap:12px; }
+  .head-row h1 { font:bold 18px/1 "Times New Roman", Times, serif; margin:0; }
+  #presence, #typing { font-size:13px; color:var(--muted); margin-top:4px; }
+  main { margin-top:56px; margin-bottom:56px; height:calc(100vh - 112px); overflow:auto; border-left:1px solid var(--border); border-right:1px solid var(--border); }
+  #log { padding:8px 12px 16px 12px; }
+  #loadMore { display:none; margin:8px 0 12px 0; background:transparent; border:1px solid var(--border); padding:4px 8px; font-size:14px; cursor:pointer; }
+  .msg { padding:6px 0; border-bottom:1px solid var(--border); word-wrap:break-word; overflow-wrap:anywhere; }
+  .time { color:var(--muted); }
+  .name { font-weight:bold; }
+  .body { white-space:pre-wrap; }
+  .composer { display:flex; gap:8px; align-items:center; }
+  input[type="text"] { font:16px/1.4 "Times New Roman", Times, serif; border:1px solid var(--border); background:transparent; color:var(--text); padding:6px 8px; }
+  #name { max-width:200px; }
+  #body { flex:1; }
+  #send { padding:6px 12px; border:1px solid var(--border); background:transparent; cursor:pointer; }
+  small.help { display:block; margin-top:6px; color:var(--muted); font-size:13px; }
 </style>
 </head>
 <body>
 <header>
   <div class="wrap">
     <div class="head-row">
-      <h1>Melbourne Wall Chat</h1>
-      <span id="roomName" class="pill">room: default</span>
-      <div class="controls">
-        <button id="copyLink" title="Copy room link">Copy room link</button>
-        <button id="changeRoom" title="Change room">Change room</button>
-      </div>
+      <h1>Tiny Chat</h1>
     </div>
     <div id="presence" aria-live="polite"></div>
     <div id="typing" aria-live="polite"></div>
@@ -111,7 +45,6 @@
 <main>
   <div id="log" class="wrap" aria-live="polite">
     <button id="loadMore">Load older messages</button>
-    <!-- messages insert here -->
   </div>
 </main>
 
@@ -122,30 +55,24 @@
       <input type="text" name="body" id="body" placeholder="Say something…" maxlength="1000" required />
       <button id="send" type="submit">Send</button>
     </form>
-    <small class="help">Use <code>?room=your-room</code> to create/share rooms. Put your Supabase URL and anon key into <code>config.js</code>. Never expose service keys.</small>
+    <small class="help">Put your Supabase URL and anon key into <code>config.js</code>. Never expose service keys.</small>
   </div>
 </footer>
 
-<!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="./config.js"></script>
 <script>
-  // --- Basic config / helpers ---
   const SUPABASE_URL  = window.__TCFG?.SUPABASE_URL || "";
   const SUPABASE_ANON = window.__TCFG?.SUPABASE_ANON || "";
   if (!SUPABASE_URL || !SUPABASE_ANON) {
     alert("Missing Supabase config. Edit config.js and fill SUPABASE_URL and SUPABASE_ANON.");
   }
-  const qs = new URLSearchParams(location.search);
-  function slugify(s){ return (s||"").toLowerCase().replace(/[^a-z0-9_-]+/g,"-").replace(/^-+|-+$/g,"").slice(0,64) || "default"; }
-  const ROOM = slugify(qs.get("room") || "default");
   const dom = (id)=>document.getElementById(id);
   function escapeHtml(s){ return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-  function scrollToBottom(){ const log = dom('log'); log.parentElement.scrollTop = log.parentElement.scrollHeight; }
+  function scrollToBottom(){ const frame = document.querySelector('main'); frame.scrollTop = frame.scrollHeight; }
 
   const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
-  dom('roomName').textContent = `room: ${ROOM}`;
   dom('name').value = localStorage.getItem('tinychat:name') || "";
   dom('name').addEventListener('input', e => localStorage.setItem('tinychat:name', e.target.value));
 
@@ -153,14 +80,13 @@
   let typingTimeout = null;
   let earliestLoaded = null;
 
-  // --- Presence rendered as plain text list ---
   function renderPresence(state) {
     const names = Object.keys(state).sort();
     dom('presence').textContent = names.length ? `Present: ${names.join(', ')}` : 'Present: —';
   }
 
   function setupPresence(nameKey) {
-    presenceChannel = supabase.channel('presence:' + ROOM, { config: { presence: { key: nameKey } } });
+    presenceChannel = supabase.channel('presence:main', { config: { presence: { key: nameKey } } });
 
     presenceChannel.on('presence', { event: 'sync' }, () => {
       renderPresence(presenceChannel.presenceState());
@@ -179,13 +105,11 @@
     });
   }
 
-  // --- Plain message line renderer ---
   function render(m, { prepend=false } = {}){
     const el = document.createElement('div');
     el.className = 'msg';
     const t = new Date(m.created_at).toLocaleTimeString();
     el.innerHTML = `<span class="time">[${t}]</span> <span class="name">${escapeHtml(m.user_name)}</span>: <span class="body">${escapeHtml(m.body)}</span>`;
-
     const log = dom('log');
     if (prepend) {
       const btn = dom('loadMore');
@@ -196,12 +120,10 @@
     }
   }
 
-  // --- Initial & paged loads ---
   async function loadInitial() {
     const { data, error } = await supabase
       .from('messages')
       .select('*')
-      .eq('room', ROOM)
       .order('created_at', { ascending: false })
       .limit(50);
     if (!error) {
@@ -219,26 +141,23 @@
     const { data, error } = await supabase
       .from('messages')
       .select('*')
-      .eq('room', ROOM)
       .lt('created_at', earliestLoaded)
       .order('created_at', { ascending: false })
       .limit(50);
     if (!error) {
       const arr = data.slice().reverse();
-      arr.forEach(m => render(m, { prepend: true }));
+      arr.forEach(m => render(m, { prepend:true }));
       if (arr.length) earliestLoaded = arr[0].created_at;
       else dom('loadMore').disabled = true;
     }
   }
 
-  // --- Live inserts ---
   supabase
-    .channel('room:' + ROOM)
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `room=eq.${ROOM}` },
+    .channel('room:main')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' },
       payload => { render(payload.new); scrollToBottom(); })
     .subscribe();
 
-  // --- Compose/send ---
   dom('chat').addEventListener('submit', async (e) => {
     e.preventDefault();
     const name = dom('name').value.trim();
@@ -247,7 +166,7 @@
     if (window.__lastSend && Date.now() - window.__lastSend < 800) return;
     window.__lastSend = Date.now();
 
-    const { error } = await supabase.from('messages').insert({ room: ROOM, user_name: name, body });
+    const { error } = await supabase.from('messages').insert({ user_name: name, body });
     if (!error) {
       dom('body').value = '';
       dom('typing').textContent = "";
@@ -261,20 +180,6 @@
     }
   });
 
-  // --- Header controls ---
-  dom('copyLink').addEventListener('click', async () => {
-    const url = `${location.origin}${location.pathname}?room=${ROOM}`;
-    try { await navigator.clipboard.writeText(url); } catch (_) {}
-    dom('copyLink').textContent = 'Copied';
-    setTimeout(()=> dom('copyLink').textContent='Copy room link', 1200);
-  });
-  dom('changeRoom').addEventListener('click', () => {
-    const r = prompt('New room name (letters/numbers/-/_):', ROOM);
-    if (!r) return;
-    location.search = '?room=' + slugify(r);
-  });
-
-  // --- Boot ---
   (async () => {
     const nameKey = (localStorage.getItem('tinychat:name') || 'guest').slice(0, 32) || 'guest';
     setupPresence(nameKey);
