@@ -1,15 +1,40 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="light dark" />
 <title>Naarm Wall Chat</title>
+
+<!-- Set initial theme ASAP to avoid flash -->
+<script>
+  (function () {
+    try {
+      const KEY = 'nw-theme';
+      const saved = localStorage.getItem(KEY);
+      const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const initial = saved || (prefersDark ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', initial);
+    } catch (_) {}
+  })();
+</script>
+
 <style>
-  /* ======= Plain, text-first aesthetic ======= */
+  /* ======= Plain, text-first aesthetic with theme variables ======= */
   * { box-sizing: border-box; }
   :root {
     --bg:#fff; --text:#000; --border:#000; --muted:#444; --maxw:860px;
     --vh: 100vh; /* updated by JS; falls back to 100vh */
+  }
+  /* Dark theme overrides */
+  :root[data-theme="dark"] {
+    --bg:#000; --text:#fff; --border:#fff; --muted:#bbb;
+  }
+  /* Respect system preference when user hasn't chosen (optional) */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme]), :root[data-theme="system"] {
+      --bg:#000; --text:#fff; --border:#fff; --muted:#bbb;
+    }
   }
   @supports (height: 100dvh) { :root { --vh: 100dvh; } }
 
@@ -54,6 +79,22 @@
     font: bold 18px/1 "Times New Roman", Times, serif;
     margin: 0;
   }
+
+  /* Theme toggle button (plain, text-first) */
+  #themeToggle {
+    margin-left: auto;
+    font: inherit;
+    line-height: 1;
+    -webkit-appearance: none; appearance: none;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    border-radius: 0;
+    height: 32px;
+    padding: 0 10px;
+    cursor: pointer;
+  }
+
   #presence, #typing {
     font-size: 13px; color: var(--muted);
     margin: 4px 0 0 0;
@@ -117,6 +158,8 @@
     padding: 0 10px;    /* vertical padding 0 with fixed height */
     max-width: 100%;
   }
+  #chat input::placeholder { color: var(--muted); }
+
   /* Critical for preventing sideways overflow in flex rows */
   .composer, #name, #body { min-width: 0; }
 
@@ -141,6 +184,7 @@
     <div class="wrap">
       <div class="head-row">
         <h1>Naarm Wall Chat</h1>
+        <button id="themeToggle" aria-label="Toggle dark mode" aria-pressed="false">Dark mode</button>
       </div>
       <div id="presence" aria-live="polite"></div>
       <div id="typing" aria-live="polite"></div>
@@ -185,6 +229,36 @@
       }
       window.addEventListener('orientationchange', updateVH);
       window.addEventListener('resize', updateVH);
+    })();
+
+    // --- Theme toggle (persisted) ---
+    (function setupThemeToggle(){
+      const KEY = 'nw-theme';
+      const btn = document.getElementById('themeToggle');
+      const root = document.documentElement;
+
+      function labelFor(theme) {
+        return theme === 'dark' ? 'Light mode' : 'Dark mode';
+      }
+      function pressedFor(theme) {
+        return theme === 'dark' ? 'true' : 'false';
+      }
+      function currentTheme() {
+        return root.getAttribute('data-theme') || 'light';
+      }
+      function setTheme(theme) {
+        root.setAttribute('data-theme', theme);
+        try { localStorage.setItem(KEY, theme); } catch (_) {}
+        btn.textContent = labelFor(theme);
+        btn.setAttribute('aria-pressed', pressedFor(theme));
+      }
+      // Initialize button label/state
+      setTheme(currentTheme());
+
+      btn.addEventListener('click', () => {
+        const next = currentTheme() === 'dark' ? 'light' : 'dark';
+        setTheme(next);
+      });
     })();
 
     // --- Basic config / helpers ---
