@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Tiny Chat (Supabase + GitHub Pages)</title>
+<style>
+  :root { --bg:#0b0e14; --panel:#111626; --soft:#1a2140; --text:#e7e9ee; --muted:#9aa3b2; }
+  * { box-sizing: border-box }
+  body { margin:0; font:16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color:var(--text); background:linear-gradient(180deg, var(--bg), #0e1220 60%); height:100vh; display:grid; grid-template-rows:auto 1fr auto }
+  header, footer { padding:12px 16px; background:var(--panel); border-bottom:1px solid #20263b }
+  footer { border-top:1px solid #20263b; border-bottom:none }
+  .wrap { max-width:880px; margin:0 auto; width:100% }
+  #log { padding:16px; overflow:auto; }
+  .msg { padding:10px 12px; margin:8px 0; background:var(--soft); border:1px solid #272f53; border-radius:12px; word-wrap:break-word; }
+  .row { display:flex; gap:10px; align-items:center; }
+  .grow { flex:1 }
+  input, button { padding:12px 12px; background:#0f1430; color:var(--text); border:1px solid #303a6b; border-radius:12px; outline:none }
+  input::placeholder { color:#657099 }
+  button { cursor:pointer }
+  small { color:var(--muted) }
+  .pill { display:inline-block; padding:4px 10px; background:#0e1430; border:1px solid #2b3567; border-radius:999px; font-size:12px; }
+  a { color:#a8c7ff; text-decoration:none }
+  a:hover { text-decoration:underline }
+  #presence { display:flex; flex-wrap:wrap; gap:6px; margin: 4px 0 0 0; }
+  .presence-badge { font-size:12px; padding:3px 8px; background:#0d1330; border:1px solid #2b3567; border-radius:999px; color:#c9d4ff; }
+  #typing { margin-top:6px; font-size:12px; color: var(--muted); min-height: 18px; }
+  #loadMore { margin: 8px 0 0 0; }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap row">
+    <div class="grow">
+      <strong>Tiny Chat</strong>
+      <small id="roomName" style="margin-left:8px" class="pill"></small>
+      <div id="presence"></div>
+      <div id="typing"></div>
+    </div>
+    <div class="row" style="gap:6px">
+      <button id="copyLink">Copy room link</button>
+      <button id="changeRoom">Change room</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap" id="log" aria-live="polite">
+  <button id="loadMore" style="display:none">Load older messages</button>
+</main>
+
+<footer>
+  <div class="wrap">
+    <form id="chat" class="row" autocomplete="off">
+      <input name="name" id="name" placeholder="Name" required style="max-width:180px" />
+      <input name="body" id="body" placeholder="Say something…" class="grow" maxlength="1000" required />
+      <button id="send">Send</button>
+    </form>
+    <small>Use <code>?room=your-room</code> to create/share rooms. Put your Supabase URL and anon key into <code>config.js</code>. Never expose service keys.</small>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./config.js"></script>
+<script>
+  const SUPABASE_URL = window.__TCFG?.SUPABASE_URL || "";
+  const SUPABASE_ANON = window.__TCFG?.SUPABASE_ANON || "";
+  if (!SUPABASE_URL || !SUPABASE_ANON) {
+    alert("Missing Supabase config. Edit config.js and fill SUPABASE_URL and SUPABASE_ANON.");
+  }
+
+  const qs = new URLSearchParams(location.search);
+  function slugify(s){ return (s||"").toLowerCase().replace(/[^a-z0-9_-]+/g,"-").replace(/^-+|-+$/g,"").slice(0,64) || "default"; }
+  const ROOM = slugify(qs.get("room") || "default");
+  const dom = (id)=>document.getElementById(id);
+  function escapeHtml(s){ return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function scrollToBottom(){ const log = dom('log'); log.scrollTop = log.scrollHeight; }
+
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+  dom('roomName').textContent = `room: ${ROOM}`;
+  dom('name').value = localStorage.getItem('tinychat:name') || "";
+  dom('name').addEventListener('input', e => localStorage.setItem('tinychat:name', e.target.value));
+
+  let presenceChannel = null;
+  let typingTimeout = null;
+  let earliestLoaded = null;
+
+  function renderPresence(state) {
+    const p = dom('presence');
+    p.innerHTML = "";
+    const names = Object.keys(state).sort();
+    names.forEach(key => {
+      const div = document.createElement('span');
+      div.className = 'presence-badge';
+      div.textContent = key;
+      p.appendChild(div);
+    });
+  }
+
+  function setupPresence(nameKey) {
+    presenceChannel = supabase.channel('presence:' + ROOM, {
+      config: { presence: { key: nameKey } }
+    });
+
+    presenceChannel.on('presence', { event: 'sync' }, () => {
+      renderPresence(presenceChannel.presenceState());
+    });
+
+    presenceChannel.on('broadcast', { event: 'typing' }, ({ payload }) => {
+      dom('typing').textContent = `${payload.name} is typing…`;
+      clearTimeout(typingTimeout);
+      typingTimeout = setTimeout(() => dom('typing').textContent = "", 1000);
+    });
+
+    presenceChannel.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await presenceChannel.track({ name: nameKey, at: Date.now() });
+      }
+    });
+  }
+
+  function render(m, {prepend=false} = {}){
+    const el = document.createElement('div');
+    el.className = 'msg';
+    const t = new Date(m.created_at).toLocaleTimeString();
+    el.innerHTML = `<strong>${escapeHtml(m.user_name)}</strong> <small class="pill" style="margin-left:6px">${t}</small><div>${escapeHtml(m.body)}</div>`;
+    const log = dom('log');
+    if (prepend && log.firstChild && log.firstChild.id !== 'loadMore') {
+      log.insertBefore(el, log.firstChild);
+    } else {
+      log.appendChild(el);
+    }
+  }
+
+  async function loadInitial() {
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('room', ROOM)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (!error) {
+      data.reverse().forEach(m => render(m));
+      if (data.length) {
+        earliestLoaded = data[0].created_at;
+        dom('loadMore').style.display = 'block';
+      }
+      scrollToBottom();
+    }
+  }
+
+  async function loadOlder() {
+    if (!earliestLoaded) return;
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('room', ROOM)
+      .lt('created_at', earliestLoaded)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (!error) {
+      const arr = data.slice().reverse();
+      arr.forEach(m => render(m, {prepend:true}));
+      if (arr.length) earliestLoaded = arr[0].created_at;
+      else dom('loadMore').disabled = true;
+    }
+  }
+
+  supabase
+    .channel('room:' + ROOM)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `room=eq.${ROOM}` },
+      payload => { render(payload.new); scrollToBottom(); })
+    .subscribe();
+
+  dom('chat').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = dom('name').value.trim();
+    const body = dom('body').value.trim();
+    if (!name || !body) return;
+    if (window.__lastSend && Date.now() - window.__lastSend < 800) return;
+    window.__lastSend = Date.now();
+
+    const { error } = await supabase.from('messages').insert({ room: ROOM, user_name: name, body });
+    if (!error) {
+      dom('body').value = '';
+      dom('typing').textContent = "";
+    }
+  });
+
+  dom('body').addEventListener('input', () => {
+    const name = dom('name').value.trim() || 'guest';
+    if (presenceChannel) {
+      presenceChannel.send({ type: 'broadcast', event: 'typing', payload: { name } });
+    }
+  });
+
+  dom('copyLink').addEventListener('click', async () => {
+    const url = `${location.origin}${location.pathname}?room=${ROOM}`;
+    try { await navigator.clipboard.writeText(url); } catch (e) {}
+    dom('copyLink').textContent = 'Copied!';
+    setTimeout(()=> dom('copyLink').textContent='Copy room link', 1200);
+  });
+  dom('changeRoom').addEventListener('click', () => {
+    const r = prompt('New room name (letters/numbers/-/_):', ROOM);
+    if (!r) return;
+    location.search = '?room=' + slugify(r);
+  });
+
+  (async () => {
+    const nameKey = (localStorage.getItem('tinychat:name') || 'guest').slice(0, 32) || 'guest';
+    setupPresence(nameKey);
+    await loadInitial();
+    dom('loadMore').addEventListener('click', loadOlder);
+  })();
+</script>
+</body>
+</html>
