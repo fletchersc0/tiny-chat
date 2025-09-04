@@ -2,53 +2,55 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Melbourne Wall Chat</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Tiny Chat — Single Room (Plaintext, Mobile-safe)</title>
 <style>
   /* ======= Plain, text-first aesthetic ======= */
   * { box-sizing: border-box; }
-  :root { --bg:#fff; --text:#000; --border:#000; --muted:#444; --maxw:860px; --kb:0px; }
-  html, body { height:100%; }
-  body { margin:0; font:16px/1.5 "Times New Roman", Times, serif; background:var(--bg); color:var(--text); }
+  :root {
+    --bg:#fff; --text:#000; --border:#000; --muted:#444; --maxw:860px;
+    --vh: 100vh; /* updated by JS; falls back to 100vh */
+  }
+  @supports (height: 100dvh) {
+    :root { --vh: 100dvh; } /* modern mobile browsers */
+  }
+
+  /* Grid page layout: header / scrollable main / composer */
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font: 16px/1.5 "Times New Roman", Times, serif;
+    background: var(--bg);
+    color: var(--text);
+    height: var(--vh);
+    display: grid;
+    grid-template-rows: 56px 1fr auto; /* header, main, footer */
+    overflow: hidden; /* main handles scrolling */
+  }
 
   a { color: inherit; }
   a:hover { text-decoration: underline; }
 
-  /* Header / Footer chrome */
-  header, footer {
-    position: fixed; left: 0; right: 0; height: 56px;
-    display: flex; align-items: center;
-    background: var(--bg); z-index: 10;
+  /* Header (static row) */
+  header {
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
   }
-  header { top: 0; border-bottom: 1px solid var(--border); }
-  footer {
-    bottom: 0; border-top: 1px solid var(--border);
-    padding-bottom: max(0px, env(safe-area-inset-bottom)); /* iOS home indicator */
-    transform: translateY(calc(-1 * var(--kb)));            /* lift above keyboard */
-  }
-
   .wrap { width: 100%; max-width: var(--maxw); margin: 0 auto; padding: 0 12px; }
+  .head-row { display: flex; align-items: baseline; gap: 12px; height: 56px; }
+  .head-row h1 { font: bold 18px/1 "Times New Roman", Times, serif; margin: 0; display:flex; align-items:center; }
+  #presence, #typing { font-size: 13px; color: var(--muted); margin: 4px 0 0 0; }
 
-  /* Header content */
-  .head-row { display: flex; align-items: baseline; gap: 12px; }
-  .head-row h1 { font: bold 18px/1 "Times New Roman", Times, serif; margin: 0; }
-  #presence, #typing { font-size: 13px; color: var(--muted); margin-top: 4px; }
-
-  /* Scroll area (account for header+footer and dynamic keyboard) */
+  /* Main (scrollable row) */
   main {
-    margin-top: 56px; margin-bottom: 56px;
-    height: calc(100vh - 112px - var(--kb));
+    min-height: 0;            /* allows child to scroll within grid */
     overflow: auto;
     border-left: 1px solid var(--border);
     border-right: 1px solid var(--border);
     -webkit-overflow-scrolling: touch;
+    background: var(--bg);
   }
-  /* Use dynamic viewport units when available (better on mobile) */
-  @supports (height: 100dvh) {
-    main { height: calc(100dvh - 112px - var(--kb)); }
-  }
-
-  #log { padding: 8px 12px 16px 12px; }
+  #log { padding: 8px 12px 12px 12px; }
   #loadMore {
     display: none;
     margin: 8px 0 12px 0;
@@ -64,19 +66,26 @@
     padding: 6px 0;
     border-bottom: 1px solid var(--border);
     word-wrap: break-word; overflow-wrap: anywhere;
+    background: transparent;
   }
   .time { color: var(--muted); }
   .name { font-weight: bold; }
   .body { white-space: pre-wrap; }
 
-  /* Composer */
+  /* Footer (composer row) */
+  footer {
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    padding: 8px 0 calc(8px + env(safe-area-inset-bottom)); /* no overlap & safe area */
+  }
   .composer {
     display: flex;
     gap: 8px;
-    align-items: flex-end;   /* bottom-align controls */
-    flex-wrap: wrap;         /* allow wrapping on very narrow screens */
+    align-items: flex-end; /* bottom-align controls */
+    flex-wrap: nowrap;     /* keep on one line; fields will shrink */
   }
-  /* Normalize control metrics and align bottoms perfectly */
+
+  /* Inputs/buttons: uniform height and shrink behavior */
   #chat input[type="text"], #chat button {
     font: inherit;
     line-height: 1;
@@ -85,20 +94,21 @@
     background: transparent;
     color: var(--text);
     border-radius: 0;
-    height: 36px;            /* fixed equal height */
-    padding: 0 10px;         /* vertical padding 0 to honor fixed height */
+    height: 40px;           /* generous touch target on mobile */
+    padding: 0 10px;        /* vertical padding 0 with fixed height */
+    max-width: 100%;
   }
-  /* Ensure flexing input can actually shrink (prevents Send going off-screen) */
-  #name { flex: 0 1 200px; max-width: 50%; }
-  #body { flex: 1 1 auto; min-width: 0; }  /* <-- key line */
-  #send { cursor: pointer; white-space: nowrap; }
+  /* Prevent overflow; ensure Send stays visible */
+  #name { flex: 0 1 180px; min-width: 120px; }
+  #body { flex: 1 1 auto; min-width: 0; }   /* <-- allows shrinking instead of overflowing */
+  #send { flex: 0 0 auto; white-space: nowrap; cursor: pointer; }
 
-  /* Firefox inner focus padding removal for perfect height */
+  /* Firefox inner focus padding removal */
   button::-moz-focus-inner { border: 0; padding: 0; }
 
-  /* Narrow phones: let the name shrink a bit more */
+  /* Narrow phones: allow name to shrink a bit more; tighten side padding */
   @media (max-width: 420px) {
-    #name { flex-basis: 140px; }
+    #name { flex-basis: 150px; min-width: 110px; }
     .wrap { padding: 0 8px; }
   }
 
@@ -106,208 +116,208 @@
 </style>
 </head>
 <body>
-<header>
-  <div class="wrap">
-    <div class="head-row">
-      <h1>Melbourne Wall Chat</h1>
-      <!-- Optional static label; remove if you don't want it shown -->
-      <!-- <span style="font-size:13px;color:#444;">room: default</span> -->
+  <header>
+    <div class="wrap">
+      <div class="head-row">
+        <h1>Tiny Chat</h1>
+      </div>
+      <div id="presence" aria-live="polite"></div>
+      <div id="typing" aria-live="polite"></div>
     </div>
-    <div id="presence" aria-live="polite"></div>
-    <div id="typing" aria-live="polite"></div>
-  </div>
-</header>
+  </header>
 
-<main>
-  <div id="log" class="wrap" aria-live="polite">
-    <button id="loadMore">Load older messages</button>
-    <!-- messages insert here -->
-  </div>
-</main>
+  <main>
+    <div id="log" class="wrap" aria-live="polite">
+      <button id="loadMore">Load older messages</button>
+      <!-- messages insert here -->
+    </div>
+  </main>
 
-<footer>
-  <div class="wrap">
-    <form id="chat" class="composer" autocomplete="off">
-      <input type="text" name="name" id="name" placeholder="Name" required />
-      <input type="text" name="body" id="body" placeholder="Say something…" maxlength="1000" required />
-      <button id="send" type="submit">Send</button>
-    </form>
-  </div>
-</footer>
+  <footer>
+    <div class="wrap">
+      <form id="chat" class="composer" autocomplete="off">
+        <input type="text" name="name" id="name" placeholder="Name" required />
+        <input type="text" name="body" id="body" placeholder="Say something…" maxlength="1000" required />
+        <button id="send" type="submit">Send</button>
+      </form>
+      <small class="help">Put your Supabase URL and anon key into <code>config.js</code>. Never expose service keys.</small>
+    </div>
+  </footer>
 
-<!-- Supabase -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="./config.js"></script>
-<script>
-  // --- Basic config / helpers ---
-  const SUPABASE_URL  = window.__TCFG?.SUPABASE_URL || "";
-  const SUPABASE_ANON = window.__TCFG?.SUPABASE_ANON || "";
-  if (!SUPABASE_URL || !SUPABASE_ANON) {
-    alert("Missing Supabase config. Edit config.js and fill SUPABASE_URL and SUPABASE_ANON.");
-  }
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./config.js"></script>
+  <script>
+    // --- Dynamic viewport height: keeps footer visible when keyboard opens ---
+    (function setDynamicVh(){
+      const root = document.documentElement;
+      function updateVH(){
+        if (window.visualViewport) {
+          root.style.setProperty('--vh', window.visualViewport.height + 'px');
+        }
+      }
+      updateVH();
+      if (window.visualViewport) {
+        visualViewport.addEventListener('resize', updateVH);
+        visualViewport.addEventListener('scroll', updateVH);
+      }
+      window.addEventListener('orientationchange', updateVH);
+    })();
 
-  // Hard-lock to a single room value that matches your DB 'messages.room'
-  const ROOM = "default";
+    // --- Basic config / helpers ---
+    const SUPABASE_URL  = window.__TCFG?.SUPABASE_URL || "";
+    const SUPABASE_ANON = window.__TCFG?.SUPABASE_ANON || "";
+    if (!SUPABASE_URL || !SUPABASE_ANON) {
+      alert("Missing Supabase config. Edit config.js and fill SUPABASE_URL and SUPABASE_ANON.");
+    }
 
-  const dom = (id)=>document.getElementById(id);
-  function escapeHtml(s){ return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-  function scrollToBottom(){
-    const frame = document.querySelector('main');
-    frame.scrollTop = frame.scrollHeight;
-  }
+    // Hard-lock to a single room value that matches your DB 'messages.room'
+    const ROOM = "default";
 
-  // Lift UI when the soft keyboard opens (mobile)
-  (function setupKeyboardLift(){
-    if (!window.visualViewport) return;
-    const root = document.documentElement;
-    const update = () => {
-      const vv = window.visualViewport;
-      const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-      root.style.setProperty('--kb', kb + 'px');
-    };
-    visualViewport.addEventListener('resize', update);
-    visualViewport.addEventListener('scroll', update);
-    window.addEventListener('orientationchange', update);
-    update();
-  })();
+    const dom = (id)=>document.getElementById(id);
+    function escapeHtml(s){ return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function scrollToBottom(){
+      const frame = document.querySelector('main');
+      frame.scrollTop = frame.scrollHeight;
+    }
 
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
-  // Persist name locally
-  dom('name').value = localStorage.getItem('tinychat:name') || "";
-  dom('name').addEventListener('input', e => localStorage.setItem('tinychat:name', e.target.value));
+    // Persist name locally
+    dom('name').value = localStorage.getItem('tinychat:name') || "";
+    dom('name').addEventListener('input', e => localStorage.setItem('tinychat:name', e.target.value));
 
-  let presenceChannel = null;
-  let typingTimeout = null;
-  let earliestLoaded = null; // timestamp of the oldest message currently shown
+    let presenceChannel = null;
+    let typingTimeout = null;
+    let earliestLoaded = null; // timestamp of the oldest message currently shown
 
-  // --- Presence as plain text list ---
-  function renderPresence(state) {
-    const names = Object.keys(state).sort();
-    dom('presence').textContent = names.length ? `Present: ${names.join(', ')}` : 'Present: —';
-  }
+    // --- Presence as plain text list ---
+    function renderPresence(state) {
+      const names = Object.keys(state).sort();
+      dom('presence').textContent = names.length ? `Present: ${names.join(', ')}` : 'Present: —';
+    }
 
-  function setupPresence(nameKey) {
-    presenceChannel = supabase.channel('presence:' + ROOM, { config: { presence: { key: nameKey } } });
+    function setupPresence(nameKey) {
+      presenceChannel = supabase.channel('presence:' + ROOM, { config: { presence: { key: nameKey } } });
 
-    presenceChannel.on('presence', { event: 'sync' }, () => {
-      renderPresence(presenceChannel.presenceState());
-    });
+      presenceChannel.on('presence', { event: 'sync' }, () => {
+        renderPresence(presenceChannel.presenceState());
+      });
 
-    presenceChannel.on('broadcast', { event: 'typing' }, ({ payload }) => {
-      dom('typing').textContent = `${payload.name} is typing…`;
-      clearTimeout(typingTimeout);
-      typingTimeout = setTimeout(() => dom('typing').textContent = "", 900);
-    });
+      presenceChannel.on('broadcast', { event: 'typing' }, ({ payload }) => {
+        dom('typing').textContent = `${payload.name} is typing…`;
+        clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(() => dom('typing').textContent = "", 900);
+      });
 
-    presenceChannel.subscribe(async (status) => {
-      if (status === 'SUBSCRIBED') {
-        await presenceChannel.track({ name: nameKey, at: Date.now() });
+      presenceChannel.subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await presenceChannel.track({ name: nameKey, at: Date.now() });
+        }
+      });
+    }
+
+    // --- Plain message line renderer ---
+    function render(m, { prepend=false } = {}){
+      const el = document.createElement('div');
+      el.className = 'msg';
+      const t = new Date(m.created_at).toLocaleTimeString();
+      el.innerHTML = `<span class="time">[${t}]</span> <span class="name">${escapeHtml(m.user_name)}</span>: <span class="body">${escapeHtml(m.body)}</span>`;
+
+      const log = dom('log');
+      if (prepend) {
+        const btn = dom('loadMore');
+        if (btn && btn.nextSibling) log.insertBefore(el, btn.nextSibling);
+        else log.appendChild(el);
+      } else {
+        log.appendChild(el);
+      }
+    }
+
+    // --- Initial & paged loads (filter by ROOM) ---
+    async function loadInitial() {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('room', ROOM)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) return;
+
+      const arr = (data || []).slice().reverse(); // oldest -> newest for rendering
+      arr.forEach(m => render(m));
+
+      if (arr.length) {
+        earliestLoaded = arr[0].created_at;      // oldest in the list
+        dom('loadMore').style.display = 'inline-block';
+      }
+      scrollToBottom();
+    }
+
+    async function loadOlder() {
+      if (!earliestLoaded) return;
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('room', ROOM)
+        .lt('created_at', earliestLoaded)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) return;
+
+      const arr = (data || []).slice().reverse();
+      arr.forEach(m => render(m, { prepend:true }));
+      if (arr.length) earliestLoaded = arr[0].created_at;
+      else dom('loadMore').disabled = true;
+    }
+
+    // --- Live inserts (listen only for this ROOM) ---
+    supabase
+      .channel('room:' + ROOM)
+      .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `room=eq.${ROOM}`
+        },
+        payload => { render(payload.new); scrollToBottom(); }
+      )
+      .subscribe();
+
+    // --- Compose/send (insert with room: ROOM) ---
+    dom('chat').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = dom('name').value.trim();
+      const body = dom('body').value.trim();
+      if (!name || !body) return;
+
+      // naive spam throttle
+      if (window.__lastSend && Date.now() - window.__lastSend < 800) return;
+      window.__lastSend = Date.now();
+
+      const { error } = await supabase.from('messages').insert({ room: ROOM, user_name: name, body });
+      if (!error) {
+        dom('body').value = '';
+        dom('typing').textContent = "";
       }
     });
-  }
 
-  // --- Plain message line renderer ---
-  function render(m, { prepend=false } = {}){
-    const el = document.createElement('div');
-    el.className = 'msg';
-    const t = new Date(m.created_at).toLocaleTimeString();
-    el.innerHTML = `<span class="time">[${t}]</span> <span class="name">${escapeHtml(m.user_name)}</span>: <span class="body">${escapeHtml(m.body)}</span>`;
+    dom('body').addEventListener('input', () => {
+      const name = dom('name').value.trim() || 'guest';
+      if (presenceChannel) {
+        presenceChannel.send({ type: 'broadcast', event: 'typing', payload: { name } });
+      }
+    });
 
-    const log = dom('log');
-    if (prepend) {
-      const btn = dom('loadMore');
-      if (btn && btn.nextSibling) log.insertBefore(el, btn.nextSibling);
-      else log.appendChild(el);
-    } else {
-      log.appendChild(el);
-    }
-  }
-
-  // --- Initial & paged loads (filter by ROOM) ---
-  async function loadInitial() {
-    const { data, error } = await supabase
-      .from('messages')
-      .select('*')
-      .eq('room', ROOM)
-      .order('created_at', { ascending: false })
-      .limit(50);
-
-    if (error) return;
-
-    const arr = (data || []).slice().reverse(); // oldest -> newest for rendering
-    arr.forEach(m => render(m));
-
-    if (arr.length) {
-      earliestLoaded = arr[0].created_at;      // oldest in the list
-      dom('loadMore').style.display = 'inline-block';
-    }
-    scrollToBottom();
-  }
-
-  async function loadOlder() {
-    if (!earliestLoaded) return;
-    const { data, error } = await supabase
-      .from('messages')
-      .select('*')
-      .eq('room', ROOM)
-      .lt('created_at', earliestLoaded)
-      .order('created_at', { ascending: false })
-      .limit(50);
-
-    if (error) return;
-
-    const arr = (data || []).slice().reverse();
-    arr.forEach(m => render(m, { prepend:true }));
-    if (arr.length) earliestLoaded = arr[0].created_at;
-    else dom('loadMore').disabled = true;
-  }
-
-  // --- Live inserts (listen only for this ROOM) ---
-  supabase
-    .channel('room:' + ROOM)
-    .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'messages',
-        filter: `room=eq.${ROOM}`
-      },
-      payload => { render(payload.new); scrollToBottom(); }
-    )
-    .subscribe();
-
-  // --- Compose/send (insert with room: ROOM) ---
-  dom('chat').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const name = dom('name').value.trim();
-    const body = dom('body').value.trim();
-    if (!name || !body) return;
-
-    // naive spam throttle
-    if (window.__lastSend && Date.now() - window.__lastSend < 800) return;
-    window.__lastSend = Date.now();
-
-    const { error } = await supabase.from('messages').insert({ room: ROOM, user_name: name, body });
-    if (!error) {
-      dom('body').value = '';
-      dom('typing').textContent = "";
-    }
-  });
-
-  dom('body').addEventListener('input', () => {
-    const name = dom('name').value.trim() || 'guest';
-    if (presenceChannel) {
-      presenceChannel.send({ type: 'broadcast', event: 'typing', payload: { name } });
-    }
-  });
-
-  // --- Boot ---
-  (async () => {
-    const nameKey = (localStorage.getItem('tinychat:name') || 'guest').slice(0, 32) || 'guest';
-    setupPresence(nameKey);
-    await loadInitial();
-    dom('loadMore').addEventListener('click', loadOlder);
-  })();
-</script>
+    // --- Boot ---
+    (async () => {
+      const nameKey = (localStorage.getItem('tinychat:name') || 'guest').slice(0, 32) || 'guest';
+      setupPresence(nameKey);
+      await loadInitial();
+      dom('loadMore').addEventListener('click', loadOlder);
+    })();
+  </script>
 </body>
 </html>
