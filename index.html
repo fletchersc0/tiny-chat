@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Naarm Wall Chat</title>
+<title>Tiny Chat — Single Room (Plaintext, Mobile-safe)</title>
 <style>
   /* ======= Plain, text-first aesthetic ======= */
   * { box-sizing: border-box; }
@@ -11,12 +11,9 @@
     --bg:#fff; --text:#000; --border:#000; --muted:#444; --maxw:860px;
     --vh: 100vh; /* updated by JS; falls back to 100vh */
   }
-  @supports (height: 100dvh) {
-    :root { --vh: 100dvh; } /* modern mobile browsers */
-  }
+  @supports (height: 100dvh) { :root { --vh: 100dvh; } }
 
-  /* Grid page layout: header / scrollable main / composer */
-  html, body { height: 100%; }
+  html, body { height: 100%; overflow-x: hidden; }  /* prevent sideways scroll */
   body {
     margin: 0;
     font: 16px/1.5 "Times New Roman", Times, serif;
@@ -24,26 +21,48 @@
     color: var(--text);
     height: var(--vh);
     display: grid;
-    grid-template-rows: 56px 1fr auto; /* header, main, footer */
-    overflow: hidden; /* main handles scrolling */
+    grid-template-rows: auto 1fr auto; /* header grows if needed */
+    overflow: hidden; /* vertical scroll confined to <main> */
   }
 
   a { color: inherit; }
   a:hover { text-decoration: underline; }
 
-  /* Header (static row) */
+  /* Generic container with safe-area padding */
+  .wrap {
+    width: 100%;
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+  }
+
+  /* Header */
   header {
     border-bottom: 1px solid var(--border);
     background: var(--bg);
+    padding-top: 10px;    /* breathing room above the title */
+    padding-bottom: 6px;  /* a little space before the border */
   }
-  .wrap { width: 100%; max-width: var(--maxw); margin: 0 auto; padding: 0 12px; }
-  .head-row { display: flex; align-items: baseline; gap: 12px; height: 56px; }
-  .head-row h1 { font: bold 18px/1 "Times New Roman", Times, serif; margin: 0; display:flex; align-items:center; }
-  #presence, #typing { font-size: 13px; color: var(--muted); margin: 4px 0 0 0; }
+  .head-row {
+    display: flex;
+    align-items: center;  /* vertically center title within row */
+    gap: 12px;
+    min-height: 56px;     /* classic toolbar height feel */
+  }
+  .head-row h1 {
+    font: bold 18px/1 "Times New Roman", Times, serif;
+    margin: 0;
+  }
+  #presence, #typing {
+    font-size: 13px; color: var(--muted);
+    margin: 4px 0 0 0;
+    overflow-wrap: anywhere;  /* wrap long lists; no sideways push */
+  }
 
-  /* Main (scrollable row) */
+  /* Main (scroll area) */
   main {
-    min-height: 0;            /* allows child to scroll within grid */
+    min-height: 0;             /* enables scrolling inside this grid row */
     overflow: auto;
     border-left: 1px solid var(--border);
     border-right: 1px solid var(--border);
@@ -72,20 +91,20 @@
   .name { font-weight: bold; }
   .body { white-space: pre-wrap; }
 
-  /* Footer (composer row) */
+  /* Footer / composer */
   footer {
     border-top: 1px solid var(--border);
     background: var(--bg);
-    padding: 8px 0 calc(8px + env(safe-area-inset-bottom)); /* no overlap & safe area */
+    padding: 10px 0 calc(10px + env(safe-area-inset-bottom)); /* space from border + safe area */
   }
   .composer {
     display: flex;
     gap: 8px;
-    align-items: flex-end; /* bottom-align controls */
-    flex-wrap: nowrap;     /* keep on one line; fields will shrink */
+    align-items: flex-end; /* align bottoms cleanly */
+    flex-wrap: wrap;       /* allow wrapping on narrow phones instead of overflow */
   }
 
-  /* Inputs/buttons: uniform height and shrink behavior */
+  /* Inputs/buttons: uniform height + shrink behavior */
   #chat input[type="text"], #chat button {
     font: inherit;
     line-height: 1;
@@ -94,24 +113,26 @@
     background: transparent;
     color: var(--text);
     border-radius: 0;
-    height: 40px;           /* generous touch target on mobile */
-    padding: 0 10px;        /* vertical padding 0 with fixed height */
+    height: 40px;       /* good touch size */
+    padding: 0 10px;    /* vertical padding 0 with fixed height */
     max-width: 100%;
   }
-  /* Prevent overflow; ensure Send stays visible */
-  #name { flex: 0 1 180px; min-width: 120px; }
-  #body { flex: 1 1 auto; min-width: 0; }   /* <-- allows shrinking instead of overflowing */
+  /* Critical for preventing sideways overflow in flex rows */
+  .composer, #name, #body { min-width: 0; }
+
+  #name { flex: 0 1 180px; min-width: 110px; }
+  #body { flex: 1 1 auto; }                 /* grows/shrinks as needed */
   #send { flex: 0 0 auto; white-space: nowrap; cursor: pointer; }
+
+  /* If the row is too tight, let Send drop to its own line */
+  @media (max-width: 420px) {
+    #send { width: 100%; margin-top: 6px; }
+    .wrap { padding-left: max(8px, env(safe-area-inset-left));
+            padding-right: max(8px, env(safe-area-inset-right)); }
+  }
 
   /* Firefox inner focus padding removal */
   button::-moz-focus-inner { border: 0; padding: 0; }
-
-  /* Narrow phones: allow name to shrink a bit more; tighten side padding */
-  @media (max-width: 420px) {
-    #name { flex-basis: 150px; min-width: 110px; }
-    .wrap { padding: 0 8px; }
-  }
-
   small.help { display: block; margin-top: 6px; color: var(--muted); font-size: 13px; }
 </style>
 </head>
@@ -119,7 +140,7 @@
   <header>
     <div class="wrap">
       <div class="head-row">
-        <h1>Naarm Wall Chat</h1>
+        <h1>Tiny Chat</h1>
       </div>
       <div id="presence" aria-live="polite"></div>
       <div id="typing" aria-live="polite"></div>
@@ -148,12 +169,14 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./config.js"></script>
   <script>
-    // --- Dynamic viewport height: keeps footer visible when keyboard opens ---
+    // --- Dynamic viewport height: keeps layout stable with mobile keyboard ---
     (function setDynamicVh(){
       const root = document.documentElement;
       function updateVH(){
         if (window.visualViewport) {
           root.style.setProperty('--vh', window.visualViewport.height + 'px');
+        } else {
+          root.style.setProperty('--vh', window.innerHeight + 'px');
         }
       }
       updateVH();
@@ -162,6 +185,7 @@
         visualViewport.addEventListener('scroll', updateVH);
       }
       window.addEventListener('orientationchange', updateVH);
+      window.addEventListener('resize', updateVH);
     })();
 
     // --- Basic config / helpers ---
