@@ -119,7 +119,11 @@
     padding: 4px 8px;
     font-size: 14px;
     cursor: pointer;
+    color: var(--text);        
+    -webkit-appearance: none;    
+    appearance: none;
   }
+  #loadMore:disabled { opacity: .55; cursor: default; }
 
   /* Messages: plain lines */
   .msg {
@@ -318,8 +322,10 @@
     function render(m, { prepend=false } = {}){
       const el = document.createElement('div');
       el.className = 'msg';
-      const t = new Date(m.created_at).toLocaleTimeString();
-      el.innerHTML = `<span class="time">[${t}]</span> <span class="name">${escapeHtml(m.user_name)}</span>: <span class="body">${escapeHtml(m.body)}</span>`;
+      const dt  = new Date(m.created_at);
+      const pad = n => String(n).padStart(2,'0');
+      const t   = `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())} ${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+      el.innerHTML = `<span class="time" title="${dt.toString()}">[${t}]</span> <span class="name">${escapeHtml(m.user_name)}</span>: <span class="body">${escapeHtml(m.body)}</span>`;
 
       const log = dom('log');
       if (prepend) {
